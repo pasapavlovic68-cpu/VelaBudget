@@ -1038,6 +1038,10 @@ button {
   color: #b75c4e;
 }
 
+.transfer {
+  color: #4a6fa5;
+}
+
 .transaction-list {
   display: grid;
   gap: 8px;
@@ -1080,6 +1084,10 @@ button {
 
 .transaction-icon.expense {
   color: #a26738;
+}
+
+.transaction-icon.transfer {
+  color: #4a6fa5;
 }
 
 .transaction-copy {
@@ -2130,6 +2138,42 @@ button {
   gap: 6px;
   padding: 9px 10px;
   border-radius: 18px;
+}
+
+.quick-transfer-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a6fa5;
+  background: rgba(74, 111, 165, 0.08);
+  border: 1px solid rgba(74, 111, 165, 0.18);
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.quick-transfer-trigger.active {
+  color: #3a5a8a;
+  background: rgba(74, 111, 165, 0.14);
+}
+
+.transfer-info-card {
+  padding: 10px 12px !important;
+}
+
+.transfer-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-arrow {
+  font-size: 16px;
+  color: #4a6fa5;
+  font-weight: 700;
 }
 
 .quick-wallet-options {
@@ -4153,6 +4197,12 @@ button {
   color: #08636a;
   background: rgba(7, 84, 91, 0.09);
   border: 1px solid rgba(7, 84, 91, 0.16);
+}
+
+.transaction-copy .wallet-tx-badge.transfer {
+  color: #4a6fa5;
+  background: rgba(74, 111, 165, 0.09);
+  border: 1px solid rgba(74, 111, 165, 0.18);
 }
 
 @media (max-width: 430px) {

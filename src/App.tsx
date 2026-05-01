@@ -27,7 +27,7 @@ type BudgetRule = Record<BucketKey, number>;
 
 type Transaction = {
   id: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   amountVnd: number;
   usdApprox: number;
   bucket?: BucketKey;
@@ -39,6 +39,10 @@ type Transaction = {
   incomeTargetBuckets?: BucketKey[];
   comment?: string;
   createdAt: string;
+  fromWalletId?: string;
+  toWalletId?: string;
+  transferRateVnd?: number;
+  transferAmountUsd?: number;
 };
 
 type MandatoryPayment = {
@@ -481,7 +485,7 @@ function readSavedTransactions(value: unknown, defaultWalletId = DEFAULT_WALLET_
       return false;
     }
 
-    const hasValidType = item.type === 'income' || item.type === 'expense';
+    const hasValidType = item.type === 'income' || item.type === 'expense' || item.type === 'transfer';
     const hasValidBucket =
       item.bucket === undefined || item.bucket === 'needs' || item.bucket === 'lifestyle' || item.bucket === 'capital';
 
@@ -1259,6 +1263,7 @@ function deriveMandatoryProgress(
 }
 
 function shouldAffectMonthlyBudget(transaction: Transaction): boolean {
+  if (transaction.type === 'transfer') return false;
   return !(transaction.type === 'income' && transaction.walletId === 'crypto');
 }
 
@@ -2029,6 +2034,13 @@ function deriveWalletBalances(
   }
 
   for (const transaction of transactions) {
+    if (transaction.type === 'transfer') {
+      const fromId = transaction.fromWalletId && walletIds.has(transaction.fromWalletId) ? transaction.fromWalletId : fallbackWalletId;
+      const toId = transaction.toWalletId && walletIds.has(transaction.toWalletId) ? transaction.toWalletId : fallbackWalletId;
+      balances[fromId] = (balances[fromId] ?? 0) - transaction.amountVnd;
+      balances[toId] = (balances[toId] ?? 0) + transaction.amountVnd;
+      continue;
+    }
     const walletId = transaction.walletId && walletIds.has(transaction.walletId) ? transaction.walletId : fallbackWalletId;
     balances[walletId] = balances[walletId] ?? 0;
     balances[walletId] += transaction.type === 'income' ? transaction.amountVnd : -transaction.amountVnd;
@@ -2082,6 +2094,7 @@ function QuickAddOverlay({
   closing,
   onClose,
   onSubmit,
+  onTransferSubmit,
   usdRateVnd,
   budgetRule,
   activeMonth,
@@ -2103,6 +2116,7 @@ function QuickAddOverlay({
     incomeDistributionMode?: 'auto' | 'manual',
     incomeTargetBuckets?: BucketKey[],
   ) => void;
+  onTransferSubmit: (amountUsd: number, amountVnd: number, rateVnd: number, createdAt: string) => void;
   usdRateVnd: number;
   budgetRule: BudgetRule;
   activeMonth: string;
@@ -2112,7 +2126,7 @@ function QuickAddOverlay({
   wallets: Wallet[];
   defaultWalletId: string;
 }) {
-  const [mode, setMode] = useState<'income' | 'expense'>('expense');
+  const [mode, setMode] = useState<'income' | 'expense' | 'transfer'>('expense');
   const selectableWallets = getSelectableWallets(wallets);
   const resolvedDefaultWalletId = resolveDefaultWalletId(selectableWallets, defaultWalletId);
   const allQuickCats = getAllQuickCategories(categoryUsage, expenseCategoryOptions);
@@ -2128,9 +2142,10 @@ function QuickAddOverlay({
   const [manualIncomeTargets, setManualIncomeTargets] = useState<BucketKey[]>(['needs']);
   const activeMandatoryPayments = mandatoryPayments.filter((p) => p.isActive);
   const isIncome = mode === 'income';
+  const isTransfer = mode === 'transfer';
   const selectedWalletIsValid = selectableWallets.some((wallet) => wallet.id === selectedWalletId);
   const effectiveWalletId = selectedWalletIsValid ? selectedWalletId : resolvedDefaultWalletId;
-  const inputCurrency: CurrencyCode = effectiveWalletId === 'crypto' ? 'USD' : 'VND';
+  const inputCurrency: CurrencyCode = isTransfer || effectiveWalletId === 'crypto' ? 'USD' : 'VND';
   const isCryptoInput = inputCurrency === 'USD';
   const safeUsdRateVnd = usdRateVnd > 0 ? usdRateVnd : DEFAULT_USD_RATE_VND;
   const inputAmount = Number(amountDigits || 0);
@@ -2182,6 +2197,12 @@ function QuickAddOverlay({
       return;
     }
 
+    if (isTransfer) {
+      onTransferSubmit(inputAmount, amountVnd, safeUsdRateVnd, dateInputValueToIso(selectedDate));
+      setAmountDigits('');
+      return;
+    }
+
     const category = isIncome ? quickAdd.incomeCategory : selectedExpenseCategory;
     const bucketKey = isIncome
       ? ('needs' as BucketKey)
@@ -2230,23 +2251,61 @@ function QuickAddOverlay({
         </header>
 
         <div className="quick-stack">
-          <div className="quick-segmented" data-mode={mode}>
-            <i aria-hidden="true" />
+          {!isTransfer ? (
+            <div className="quick-segmented" data-mode={mode}>
+              <i aria-hidden="true" />
+              <button
+                className={isIncome ? 'active' : ''}
+                type="button"
+                onClick={() => {
+                  setMode('income');
+                  setSelectedMandatoryPaymentId(null);
+                }}
+              >
+                Доход
+              </button>
+              <button className={!isIncome ? 'active' : ''} type="button" onClick={() => setMode('expense')}>
+                Расход
+              </button>
+            </div>
+          ) : null}
+
+          {!isTransfer ? (
             <button
-              className={isIncome ? 'active' : ''}
+              className="quick-transfer-trigger"
               type="button"
               onClick={() => {
-                setMode('income');
-                setSelectedMandatoryPaymentId(null);
+                setMode('transfer');
+                setAmountDigits('');
               }}
             >
-              Доход
+              Крипта → Донги
             </button>
-            <button className={!isIncome ? 'active' : ''} type="button" onClick={() => setMode('expense')}>
-              Расход
+          ) : (
+            <button
+              className="quick-transfer-trigger active"
+              type="button"
+              onClick={() => {
+                setMode('expense');
+                setAmountDigits('');
+              }}
+            >
+              ← Назад к операциям
             </button>
-          </div>
+          )}
 
+          {isTransfer ? (
+            <section className="quick-wallet-card transfer-info-card" aria-label="Конвертация">
+              <div className="quick-section-label">Конвертация</div>
+              <div className="transfer-route">
+                <span className="wallet-chip active">Крипта</span>
+                <span className="transfer-arrow">→</span>
+                <span className="wallet-chip active">Донги</span>
+              </div>
+            </section>
+          ) : null}
+
+          {!isTransfer ? (
           <section className="quick-wallet-card" aria-label="Кошелёк">
             <div className="quick-section-label">Кошелёк</div>
             <div className="quick-wallet-options">
@@ -2262,6 +2321,7 @@ function QuickAddOverlay({
               ))}
             </div>
           </section>
+          ) : null}
 
           <section className="quick-amount-card">
             <div className="quick-amount-copy">
@@ -2273,8 +2333,8 @@ function QuickAddOverlay({
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              aria-label={isIncome ? 'Добавить доход' : 'Добавить расход'}
-              title={isIncome ? 'Добавить доход' : 'Добавить расход'}
+              aria-label={isTransfer ? 'Конвертировать' : isIncome ? 'Добавить доход' : 'Добавить расход'}
+              title={isTransfer ? 'Конвертировать' : isIncome ? 'Добавить доход' : 'Добавить расход'}
             >
               <Icon name="plus" />
             </button>
@@ -2297,7 +2357,7 @@ function QuickAddOverlay({
             )}
           </section>
 
-          {isIncome ? (
+          {!isTransfer && isIncome ? (
             <section className="quick-allocation-card">
               <div className="quick-allocation-header">
                 <div className="quick-section-label">
@@ -2356,7 +2416,7 @@ function QuickAddOverlay({
                 </>
               )}
             </section>
-          ) : (
+          ) : !isTransfer ? (
             <section className="quick-bucket-card">
               {activeMandatoryPayments.length > 0 ? (
                 <div className="quick-mandatory-section">
@@ -2429,7 +2489,7 @@ function QuickAddOverlay({
                 </div>
               ) : null}
             </section>
-          )}
+          ) : null}
 
           <div className="keypad" aria-label="Цифровая клавиатура">
             {quickAdd.keypad.map((key) => (
@@ -2701,18 +2761,22 @@ function HistoryScreen({
           filteredTransactions.map((transaction) => (
             <article className={`transaction-card ${pendingDeleteId === transaction.id ? 'confirming-delete' : ''}`} key={transaction.id}>
               <div className={`transaction-icon ${transaction.type}`}>
-                <Icon name={transaction.type === 'income' ? 'trend' : 'tag'} />
+                <Icon name={transaction.type === 'expense' ? 'tag' : 'trend'} />
               </div>
               <div className="transaction-copy">
                 <h2>{transaction.category}</h2>
                 <span>{formatTransactionDate(transaction.createdAt)}</span>
                 <p>
-                  {transaction.type === 'income' ? 'Доход' : 'Расход'}
+                  {transaction.type === 'income' ? 'Доход' : transaction.type === 'transfer' ? 'Обмен' : 'Расход'}
                   {transaction.bucket ? ` · ${bucketDisplayLabel[transaction.bucket]}` : ''}
                 </p>
-                <span className={`wallet-tx-badge ${transaction.walletId === 'crypto' ? 'crypto' : 'dongi'}`}>
-                  {getWalletName(wallets, defaultWalletId, transaction.walletId)}
-                </span>
+                {transaction.type === 'transfer' ? (
+                  <span className="wallet-tx-badge transfer">Крипта → Донги</span>
+                ) : (
+                  <span className={`wallet-tx-badge ${transaction.walletId === 'crypto' ? 'crypto' : 'dongi'}`}>
+                    {getWalletName(wallets, defaultWalletId, transaction.walletId)}
+                  </span>
+                )}
                 {transaction.type === 'expense' &&
                 transaction.bucket === 'needs' &&
                 mandatoryNames.has(transaction.category.toLowerCase()) ? (
@@ -2723,8 +2787,8 @@ function HistoryScreen({
                 <MoneyStack
                   amountVnd={transaction.amountVnd}
                   usdRateVnd={usdRateVnd}
-                  primaryClassName={transaction.type === 'income' ? 'positive' : 'negative'}
-                  prefix={transaction.type === 'income' ? '+ ' : '- '}
+                  primaryClassName={transaction.type === 'income' ? 'positive' : transaction.type === 'transfer' ? 'transfer' : 'negative'}
+                  prefix={transaction.type === 'income' ? '+ ' : ''}
                 />
                 <div className="transaction-actions">
                   <button
@@ -4165,6 +4229,25 @@ export default function App() {
     closeQuickAdd();
   };
 
+  const handleTransferSubmit = (amountUsd: number, amountVnd: number, rateVnd: number, createdAt: string) => {
+    markLocalDirty();
+    const transaction: Transaction = {
+      id: createTransactionId(),
+      type: 'transfer',
+      amountVnd,
+      usdApprox: Math.round(amountUsd),
+      fromWalletId: 'crypto',
+      toWalletId: DEFAULT_WALLET_ID,
+      transferRateVnd: rateVnd,
+      transferAmountUsd: amountUsd,
+      category: 'Крипта → Донги',
+      walletId: DEFAULT_WALLET_ID,
+      createdAt,
+    };
+    setTransactions((current) => [transaction, ...current]);
+    closeQuickAdd();
+  };
+
   const deleteTransaction = (transactionId: string) => {
     const transaction = transactions.find((item) => item.id === transactionId);
 
@@ -4435,6 +4518,7 @@ export default function App() {
             closing={quickAddClosing}
             onClose={closeQuickAdd}
             onSubmit={handleQuickAddSubmit}
+            onTransferSubmit={handleTransferSubmit}
             usdRateVnd={usdRateVnd}
             budgetRule={budgetRule}
             activeMonth={activeMonth}
