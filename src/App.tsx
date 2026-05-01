@@ -1141,23 +1141,6 @@ function getDailySpendDivisor(dailySpendDays: number, weekStartDay: WeekStartDay
   return Math.min(Math.max(7 - elapsedDays, 1), 7);
 }
 
-function deriveCryptoMonthlyIncomeUsd(
-  transactions: Transaction[],
-  activeMonth: string,
-  usdRateVnd: number,
-): number {
-  const safeRate = usdRateVnd > 0 ? usdRateVnd : DEFAULT_USD_RATE_VND;
-  const totalVnd = transactions
-    .filter(
-      (t) =>
-        t.type === 'income' &&
-        t.walletId === 'crypto' &&
-        isTransactionInActiveMonth(t.createdAt, activeMonth),
-    )
-    .reduce((sum, t) => sum + t.amountVnd, 0);
-  return Math.round(totalVnd / safeRate);
-}
-
 function deriveHomeData(
   monthlyState: MonthlyState,
   usdRateVnd: number,
@@ -1166,7 +1149,6 @@ function deriveHomeData(
   dailySpendDays: number,
   weekStartDay: WeekStartDay,
   dongiBalanceVnd: number,
-  cryptoIncomeUsd: number,
 ) {
   const buckets = Object.entries(monthlyState.buckets).map(([key, bucket]) => {
     const remainingVnd = bucket.allocatedVnd - bucket.spentVnd;
@@ -1205,7 +1187,6 @@ function deriveHomeData(
       balanceSecondary: formatUsdFromVnd(dongiBalanceVnd, usdRateVnd),
       income: formatVnd(monthlyState.totalIncomeVnd),
       incomeSecondary: formatUsdFromVnd(monthlyState.totalIncomeVnd, usdRateVnd),
-      cryptoIncomeUsd,
       dailyAvailable: formatVnd(dailyAvailableVnd),
       dailyAvailableVnd,
       dailyTotal: formatVnd(dailyTotalVnd),
@@ -1269,13 +1250,19 @@ function deriveMandatoryProgress(
 }
 
 function shouldAffectMonthlyBudget(transaction: Transaction): boolean {
-  if (transaction.type === 'transfer') return false;
   return !(transaction.type === 'income' && transaction.walletId === 'crypto');
 }
 
 function applyTransactionEffect(monthlyState: MonthlyState, transaction: Transaction): MonthlyState {
   if (!shouldAffectMonthlyBudget(transaction)) {
     return monthlyState;
+  }
+
+  if (transaction.type === 'transfer') {
+    return {
+      ...monthlyState,
+      totalIncomeVnd: monthlyState.totalIncomeVnd + transaction.amountVnd,
+    };
   }
 
   if (transaction.type === 'income') {
@@ -1331,6 +1318,13 @@ function rebuildMonthlyStateFromTransactions(transactions: Transaction[], active
 function reverseTransactionEffect(monthlyState: MonthlyState, transaction: Transaction): MonthlyState {
   if (!shouldAffectMonthlyBudget(transaction)) {
     return monthlyState;
+  }
+
+  if (transaction.type === 'transfer') {
+    return {
+      ...monthlyState,
+      totalIncomeVnd: monthlyState.totalIncomeVnd - transaction.amountVnd,
+    };
   }
 
   if (transaction.type === 'income') {
@@ -1768,11 +1762,6 @@ function BalanceCard({ data }: { data: HomeSummary }) {
           <div className="balance-row-amounts">
             <b className="money balance-row-primary balance-row-income">{data.income}</b>
             <em className="money-secondary balance-row-secondary">{data.incomeSecondary}</em>
-            {data.cryptoIncomeUsd > 0 && (
-              <em className="money-secondary balance-row-secondary balance-row-crypto">
-                + {formatNumber(data.cryptoIncomeUsd)} $ Крипта
-              </em>
-            )}
           </div>
         </div>
       </div>
@@ -2363,7 +2352,7 @@ function QuickAddOverlay({
             )}
           </section>
 
-          {!isTransfer && isIncome ? (
+          {!isTransfer && isIncome && effectiveWalletId !== 'crypto' ? (
             <section className="quick-allocation-card">
               <div className="quick-allocation-header">
                 <div className="quick-section-label">
@@ -3788,8 +3777,7 @@ export default function App() {
   const allExpenseCategoryNames = getAllExpenseCategoryNames(expenseCategories, customCategories, hiddenCategories);
   const walletBalances = useMemo(() => deriveWalletBalances(wallets, transactions, defaultWalletId), [wallets, transactions, defaultWalletId]);
   const dongiBalanceVnd = walletBalances[DEFAULT_WALLET_ID] ?? 0;
-  const cryptoIncomeUsd = deriveCryptoMonthlyIncomeUsd(transactions, activeMonth, usdRateVnd);
-  const homeData = deriveHomeData(monthlyState, usdRateVnd, budgetRule, activeMonth, dailySpendDays, weekStartDay, dongiBalanceVnd, cryptoIncomeUsd);
+  const homeData = deriveHomeData(monthlyState, usdRateVnd, budgetRule, activeMonth, dailySpendDays, weekStartDay, dongiBalanceVnd);
   const mandatoryProgress = deriveMandatoryProgress(mandatoryPayments, monthlyState.buckets.needs.allocatedVnd, transactions, activeMonth);
   const rebuiltCategoryUsage = useMemo(() => buildCategoryUsageFromTransactions(transactions), [transactions]);
   const usdRateInputFocusedRef = useRef(false);
@@ -4256,6 +4244,9 @@ export default function App() {
       walletId: DEFAULT_WALLET_ID,
       createdAt,
     };
+    if (isTransactionInActiveMonth(transaction.createdAt, activeMonth)) {
+      setMonthlyState((current) => applyTransactionEffect(current, transaction));
+    }
     setTransactions((current) => [transaction, ...current]);
     closeQuickAdd();
   };
