@@ -2145,34 +2145,42 @@ button {
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 8px 14px;
+  padding: 9px 14px;
   border-radius: 14px;
   font-size: 13px;
   font-weight: 600;
-  color: #4a6fa5;
-  background: rgba(74, 111, 165, 0.08);
-  border: 1px solid rgba(74, 111, 165, 0.18);
-  transition: background 140ms ease, color 140ms ease;
+  color: #fffaf1;
+  background: linear-gradient(145deg, #14727a, #004c53 74%);
+  border: 1px solid rgba(0, 72, 78, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 72, 78, 0.18);
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .quick-transfer-trigger.active {
-  color: #3a5a8a;
-  background: rgba(74, 111, 165, 0.14);
+  color: #fffaf1;
+  background: linear-gradient(145deg, #0d6069, #003d44 74%);
+  box-shadow: 0 3px 9px rgba(0, 60, 68, 0.22);
 }
 
 .transfer-info-card {
   padding: 10px 12px !important;
+  text-align: center;
+}
+
+.transfer-info-card .quick-section-label {
+  justify-content: center;
 }
 
 .transfer-route {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
 .transfer-arrow {
   font-size: 16px;
-  color: #4a6fa5;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -2183,6 +2191,9 @@ button {
 }
 
 .wallet-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   min-height: 34px;
   padding: 0 10px;

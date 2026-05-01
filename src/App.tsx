@@ -434,7 +434,7 @@ function readSavedWallets(value: unknown): Wallet[] {
 
   for (const item of value) {
     if (!isRecord(item)) {
-      return createDefaultWallets();
+      continue;
     }
 
     const id = typeof item.id === 'string' ? item.id.trim() : '';
@@ -450,7 +450,7 @@ function readSavedWallets(value: unknown): Wallet[] {
       (openingBalanceVnd !== undefined && !isFiniteNumber(openingBalanceVnd)) ||
       (item.isArchived !== undefined && typeof item.isArchived !== 'boolean')
     ) {
-      return createDefaultWallets();
+      continue;
     }
 
     seenIds.add(id);
@@ -464,7 +464,13 @@ function readSavedWallets(value: unknown): Wallet[] {
     });
   }
 
-  return wallets.some((wallet) => wallet.id === DEFAULT_WALLET_ID) ? wallets : createDefaultWallets();
+  for (const def of DEFAULT_WALLETS) {
+    if (!wallets.some((w) => w.id === def.id)) {
+      wallets.push({ ...def });
+    }
+  }
+
+  return wallets;
 }
 
 function readSavedDefaultWalletId(value: unknown, wallets: Wallet[]): string {
@@ -3948,8 +3954,14 @@ export default function App() {
             if (hasLocalChangesSinceCloudLoadStartedRef.current) {
               console.info('Skipped initial cloud state because local changes were made during load.');
             } else {
-              saveState(cloudState);
-              applySavedState(cloudState);
+              const localTxCount = currentSavedStateRef.current.transactions.length;
+              const cloudTxCount = cloudState.transactions.length;
+              if (cloudTxCount >= localTxCount) {
+                saveState(cloudState);
+                applySavedState(cloudState);
+              } else {
+                console.info('Kept local state: local has more transactions than cloud.');
+              }
             }
             setCloudStatus('synced');
           } else {
