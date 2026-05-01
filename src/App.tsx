@@ -722,9 +722,10 @@ function readSavedState(value: unknown): SavedState | null {
   const defaultWalletId = readSavedDefaultWalletId(value.defaultWalletId, wallets);
   const walletIds = new Set(wallets.map((wallet) => wallet.id));
   const transactions = readSavedTransactions(value.transactions, defaultWalletId, walletIds) ?? [];
+  const activeMonth = readSavedActiveMonth(value.activeMonth);
 
   return {
-    monthlyState: readSavedMonthlyState(value.monthlyState) ?? initialMonthlyState,
+    monthlyState: rebuildMonthlyStateFromTransactions(transactions, activeMonth),
     transactions,
     usdRateVnd: value.usdRateVnd,
     usdRateUpdatedAt: readSavedTimestamp(value.usdRateUpdatedAt),
@@ -734,7 +735,7 @@ function readSavedState(value: unknown): SavedState | null {
     mandatoryPayments: readSavedMandatoryPayments(value.mandatoryPayments),
     currencySettings: readSavedCurrencySettings(value.currencySettings),
     budgetRule: readSavedBudgetRule(value.budgetRule),
-    activeMonth: readSavedActiveMonth(value.activeMonth),
+    activeMonth,
     wallets,
     defaultWalletId,
     dailySpendDays: readSavedDailySpendDays(value.dailySpendDays),
@@ -1183,7 +1184,7 @@ function deriveHomeData(
     monthlyState.buckets.lifestyle.allocatedVnd -
     monthlyState.buckets.lifestyle.spentVnd;
   const dailyDivisor = getDailySpendDivisor(dailySpendDays, weekStartDay);
-  const dailyAvailableVnd = Math.round(spendableRemainingVnd / dailyDivisor);
+  const dailyAvailableVnd = Math.max(0, Math.round(spendableRemainingVnd / dailyDivisor));
   const dailyTotalVnd = Math.round(spendableAllocatedVnd / dailyDivisor);
 
   return {
