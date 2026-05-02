@@ -2210,7 +2210,7 @@ function QuickAddOverlay({
       ? ('needs' as BucketKey)
       : selectedMandatoryPaymentId
         ? ('needs' as BucketKey)
-        : resolvedExpenseBucket;
+        : resolvedExpenseBucket === 'needs' ? 'lifestyle' : resolvedExpenseBucket;
     onSubmit(
       mode,
       amountVnd,
