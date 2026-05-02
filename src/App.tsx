@@ -922,7 +922,14 @@ function formatVnd(value: number) {
 function formatUsdFromVnd(valueVnd: number, usdRateVnd: number) {
   const safeRate = usdRateVnd > 0 ? usdRateVnd : DEFAULT_USD_RATE_VND;
   const value = Math.abs(valueVnd / safeRate);
-  const rounded = value >= 10_000 ? Math.round(value / 100) * 100 : Math.round(value / 10) * 10;
+  let rounded: number;
+  if (value >= 10_000) {
+    rounded = Math.round(value / 100) * 100;
+  } else if (value >= 100) {
+    rounded = Math.round(value / 10) * 10;
+  } else {
+    rounded = Math.round(value);
+  }
   const sign = valueVnd < 0 ? '-' : '';
   return `≈ ${sign}${formatNumber(rounded)} $`;
 }
