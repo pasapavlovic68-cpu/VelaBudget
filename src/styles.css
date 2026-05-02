@@ -2376,6 +2376,12 @@ button {
   min-width: 0;
 }
 
+.quick-wallet-card .quick-section-label,
+.quick-mandatory-section .quick-section-label,
+.quick-bucket-card > .quick-section-label {
+  justify-content: center;
+}
+
 .income-distribution-toggle {
   flex: 0 0 auto;
   width: 46px;
