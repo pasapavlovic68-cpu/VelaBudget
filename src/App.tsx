@@ -2147,7 +2147,7 @@ function QuickAddOverlay({
   const isTransfer = mode === 'transfer';
   const selectedWalletIsValid = selectableWallets.some((wallet) => wallet.id === selectedWalletId);
   const effectiveWalletId = selectedWalletIsValid ? selectedWalletId : resolvedDefaultWalletId;
-  const inputCurrency: CurrencyCode = isTransfer || effectiveWalletId === 'crypto' ? 'USD' : 'VND';
+  const inputCurrency: CurrencyCode = isTransfer || (isIncome && effectiveWalletId === 'crypto') ? 'USD' : 'VND';
   const isCryptoInput = inputCurrency === 'USD';
   const safeUsdRateVnd = usdRateVnd > 0 ? usdRateVnd : DEFAULT_USD_RATE_VND;
   const inputAmount = Number(amountDigits || 0);
@@ -2217,7 +2217,7 @@ function QuickAddOverlay({
       bucketKey,
       category,
       dateInputValueToIso(selectedDate),
-      effectiveWalletId,
+      isIncome ? effectiveWalletId : DEFAULT_WALLET_ID,
       isIncome && !incomeAutoDistribution ? 'manual' : 'auto',
       isIncome && !incomeAutoDistribution ? manualIncomeTargets : undefined,
     );
@@ -2307,7 +2307,7 @@ function QuickAddOverlay({
             </section>
           ) : null}
 
-          {!isTransfer ? (
+          {isIncome ? (
           <section className="quick-wallet-card" aria-label="Кошелёк">
             <div className="quick-section-label">Кошелёк</div>
             <div className="quick-wallet-options">
