@@ -2295,9 +2295,6 @@ button {
   color: #796d62;
   font-size: 11.5px;
   line-height: 1.2;
-}
-
-.amount-suggestions p {
   text-align: center;
 }
 
@@ -2372,6 +2369,11 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.quick-allocation-header .quick-section-label {
+  flex: 1;
+  min-width: 0;
 }
 
 .income-distribution-toggle {
@@ -2515,6 +2517,7 @@ button {
   color: #625850;
   font-size: 10.5px;
   line-height: 1.2;
+  text-align: center;
 }
 
 .category-chips {
